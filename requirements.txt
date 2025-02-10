@@ -1,0 +1,8 @@
+streamlit
+selenium
+webdriver-manager
+pyzbar
+numpy
+Pillow
+pandas
+streamlit-cookies-manager
