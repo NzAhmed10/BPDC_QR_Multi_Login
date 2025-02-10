@@ -7,4 +7,3 @@ pandas
 cryptography
 python-dotenv
 opencv-python
-qrcode

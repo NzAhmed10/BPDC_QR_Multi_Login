@@ -5,7 +5,7 @@ import threading
 import time
 import numpy as np
 from PIL import Image
-from pyzbar.pyzbar import decode
+import cv2  # Replaced pyzbar with opencv-python
 from cryptography.fernet import Fernet
 import datetime
 import pandas as pd
@@ -89,7 +89,29 @@ def save_credentials(credentials):
         file.write(encrypted_data)
 
 # ======================================================
-# Selenium Login Function (Original Working Version)
+# QR Code Decoding with OpenCV
+# ======================================================
+
+def decode_qr_code(image):
+    """Decode QR code using OpenCV."""
+    # Convert the image to a numpy array
+    img_array = np.array(image)
+    
+    # Convert to grayscale (required by OpenCV's QR code detector)
+    gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
+    
+    # Initialize the QR code detector
+    detector = cv2.QRCodeDetector()
+    
+    # Detect and decode the QR code
+    data, bbox, _ = detector.detectAndDecode(gray)
+    
+    if bbox is not None:
+        return data
+    return None
+
+# ======================================================
+# Selenium Login Function
 # ======================================================
 
 def login_to_lms(account, drivers_list):
@@ -119,16 +141,11 @@ def login_to_lms(account, drivers_list):
         email_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='email']")))
         email_field.send_keys(email)
         email_field.send_keys(Keys.RETURN)
-        
-        # Modified password handling section
-        time.sleep(2)  # Additional wait for password page load
-        password_field = WebDriverWait(driver, 15).until(
-            EC.element_to_be_clickable((By.XPATH, "//input[@type='password']"))
-        )
+        time.sleep(3)
+        password_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='password']")))
         password_field.send_keys(password)
         password_field.send_keys(Keys.RETURN)
         time.sleep(5)
-        
         st.write(f"✅ {nickname} logged in successfully!")
         log_event(f"{nickname} logged in successfully")
     except Exception as e:
@@ -136,7 +153,7 @@ def login_to_lms(account, drivers_list):
         log_event(f"Error logging in for {nickname}: {e}")
 
 # ======================================================
-# Streamlit App Interface (Unchanged)
+# Streamlit App Interface
 # ======================================================
 
 st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
@@ -218,19 +235,21 @@ elif menu == "Login & QR Redirect":
         st.info("Capture a picture of the QR code using your camera.")
         captured_img = st.camera_input("Take a picture of the QR code")
         if captured_img is not None:
+            # Open the captured image using PIL
             image = Image.open(captured_img)
-            img_array = np.array(image)
-            decoded_objects = decode(img_array)
-            if decoded_objects:
-                qr_link = decoded_objects[0].data.decode("utf-8")
-                st.success(f"QR Code Detected: {qr_link}")
+            
+            # Decode the QR code
+            qr_data = decode_qr_code(image)
+            
+            if qr_data:
+                st.success(f"QR Code Detected: {qr_data}")
                 if st.button("Redirect All Sessions"):
                     for driver in st.session_state["drivers"]:
                         try:
-                            driver.get(qr_link)
+                            driver.get(qr_data)
                         except Exception as e:
                             st.write(f"Error redirecting one session: {e}")
-                    log_event(f"Redirected all sessions to {qr_link}")
+                    log_event(f"Redirected all sessions to {qr_data}")
                     st.success("All sessions redirected successfully!")
             else:
                 st.info("No QR code detected in the captured image. Please try again.")
