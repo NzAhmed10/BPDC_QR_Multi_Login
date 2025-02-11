@@ -1,2 +1,2 @@
-chromium=114
-chromium-driver=114
+chromium
+chromium-driver
