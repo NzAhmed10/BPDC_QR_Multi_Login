@@ -9,13 +9,15 @@ import cv2
 import datetime
 import pandas as pd
 
+# Selenium imports (using Firefox)
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.service import Service
+from webdriver_manager.firefox import GeckoDriverManager
 import subprocess  # Import subprocess
 
 # MUST be the very first Streamlit command!
@@ -44,12 +46,12 @@ def add_log(message):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_message = f"[{timestamp}] {message}"
     st.session_state["logs"].append(log_message)
-    print(f"Log added: {log_message}")  # Debug print to console
+    print(f"Log added: {log_message}")
 
 def clear_logs():
     """Clear all logs from session state."""
     st.session_state["logs"] = []
-    print("Logs cleared")  # Debug print to console
+    print("Logs cleared")
 
 # ======================================================
 # Credential Encryption Setup (Using st.secrets)
@@ -122,7 +124,7 @@ def decode_qr_code(image):
     return None
 
 # ======================================================
-# Selenium Login Function
+# Selenium Login Function using Firefox
 # ======================================================
 def login_to_lms(account, drivers_list):
     """
@@ -136,33 +138,30 @@ def login_to_lms(account, drivers_list):
     add_log(f"[{nickname}] Starting login process.")
     print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")
 
-    options = webdriver.ChromeOptions()
+    # Set up Firefox options
+    options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.binary_location = "/usr/bin/google-chrome-stable"
 
     try:
-        add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
-        #  Remove the version argument here. ChromeDriverManager will by default
-        #  try to download the latest compatible version.
-        driver_path = ChromeDriverManager().install()
+        add_log(f"[{nickname}] Launching GeckoDriver using GeckoDriverManager.")
+        driver_path = GeckoDriverManager().install()
         service = Service(driver_path)
-        driver = webdriver.Chrome(service=service, options=options)
+        driver = webdriver.Firefox(service=service, options=options)
 
-        # Check if driver was launched successfully (basic check)
+        # Basic check to ensure the driver is launched
         try:
-            driver.title # Accessing title should cause error if driver is not properly initialized
-            add_log(f"[{nickname}] ChromeDriver launched successfully using auto version detection.") # Modified log message
+            _ = driver.title  # Accessing title as a basic check
+            add_log(f"[{nickname}] GeckoDriver launched successfully using auto version detection.")
         except Exception as check_e:
             add_log(f"[{nickname}] Error after driver initialization, possibly driver launch failure: {check_e}")
             st.error(f"[{nickname}] Error after driver initialization, possibly driver launch failure: {check_e}")
-            return # Exit if even basic check fails
-
+            return
     except Exception as e:
-        st.error(f"[{nickname}] Error launching ChromeDriver: {e}")
-        add_log(f"[{nickname}] Error launching ChromeDriver: {e}")
+        st.error(f"[{nickname}] Error launching GeckoDriver: {e}")
+        add_log(f"[{nickname}] Error launching GeckoDriver: {e}")
         return
 
     drivers_list.append(driver)
@@ -196,9 +195,9 @@ def login_to_lms(account, drivers_list):
     except Exception as e:
         st.error(f"[{nickname}] Error during login after driver launch: {e}")
         add_log(f"[{nickname}] Error during login after driver launch: {e}")
-        if driver: # Ensure driver is quit even if login fails after launch
+        if driver:
             driver.quit()
-            drivers_list.remove(driver) # Remove the driver if login failed.
+            drivers_list.remove(driver)
 
 # ======================================================
 # Streamlit App Interface
