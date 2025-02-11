@@ -8,6 +8,7 @@ from PIL import Image
 import cv2
 import datetime
 import pandas as pd
+import shutil  # Added for file operations
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -143,7 +144,7 @@ def login_to_lms(account, drivers_list):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     
-    # Linux-specific: set binary location if running on a posix system
+    # Linux-specific: set binary location if running on a posix system.
     if os.name == 'posix':
         if os.path.exists("/usr/bin/google-chrome"):
             options.binary_location = "/usr/bin/google-chrome"
@@ -154,7 +155,20 @@ def login_to_lms(account, drivers_list):
 
     try:
         add_log(f"[{nickname}] Launching ChromeDriver.")
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        # Attempt to download and install ChromeDriver
+        try:
+            driver_path = ChromeDriverManager().install()
+        except Exception as e:
+            # If the error message indicates the downloaded file is not a zip file, remove the corrupted directory and retry.
+            if "not a zip file" in str(e).lower():
+                corrupted_dir = os.path.join(os.path.expanduser("~/.wdm/drivers/chromedriver/linux64/114.0.5735.90"))
+                if os.path.exists(corrupted_dir):
+                    add_log(f"[{nickname}] Removing corrupted ChromeDriver directory: {corrupted_dir}")
+                    shutil.rmtree(corrupted_dir)
+                driver_path = ChromeDriverManager().install()
+            else:
+                raise
+        driver = webdriver.Chrome(service=Service(driver_path), options=options)
         add_log(f"[{nickname}] ChromeDriver launched successfully.")
     except Exception as e:
         st.error(f"[{nickname}] Error launching ChromeDriver: {e}")
