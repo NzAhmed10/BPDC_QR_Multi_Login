@@ -133,15 +133,11 @@ def login_to_lms(account, drivers_list):
     email = account["email"]
     password = account["password"]
 
-    CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
-    CHROME_BINARY_PATH = "/usr/bin/chromium-browser"
-
     add_log(f"[{nickname}] Starting login process.")
     print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")
 
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
-    options.binary_location = CHROME_BINARY_PATH
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
@@ -150,8 +146,8 @@ def login_to_lms(account, drivers_list):
         add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
         #  Remove the version argument here. ChromeDriverManager will by default
         #  try to download the latest compatible version.
-        #driver_path = ChromeDriverManager().install()
-        service = Service(CHROMEDRIVER_PATH)
+        driver_path = ChromeDriverManager().install()
+        service = Service(driver_path)
         driver = webdriver.Chrome(service=service, options=options)
 
         # Check if driver was launched successfully (basic check)
