@@ -9,16 +9,16 @@ import cv2
 import datetime
 import pandas as pd
 
-# Selenium imports (using Firefox)
+# Selenium imports using Firefox
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.firefox import GeckoDriverManager
-import subprocess  # Import subprocess
+import subprocess
 
 # MUST be the very first Streamlit command!
 st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
@@ -74,7 +74,6 @@ except Exception as e:
 def load_credentials():
     """
     Load and decrypt credentials from the browser cookie.
-    The encrypted JSON string is stored in the cookie named COOKIE_NAME.
     """
     encrypted_data = cookies.get(COOKIE_NAME)
     if encrypted_data:
@@ -124,13 +123,9 @@ def decode_qr_code(image):
     return None
 
 # ======================================================
-# Selenium Login Function using Firefox
+# Selenium Login Function using Firefox with modified password handling
 # ======================================================
 def login_to_lms(account, drivers_list):
-    """
-    Log into BITS LMS using Selenium for a single account and add the driver to drivers_list.
-    Detailed logs are added for each step.
-    """
     nickname = account.get("nickname", "Unknown")
     email = account["email"]
     password = account["password"]
@@ -138,7 +133,6 @@ def login_to_lms(account, drivers_list):
     add_log(f"[{nickname}] Starting login process.")
     print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")
 
-    # Set up Firefox options
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
@@ -151,13 +145,12 @@ def login_to_lms(account, drivers_list):
         service = Service(driver_path)
         driver = webdriver.Firefox(service=service, options=options)
 
-        # Basic check to ensure the driver is launched
         try:
-            _ = driver.title  # Accessing title as a basic check
+            _ = driver.title  # Basic check
             add_log(f"[{nickname}] GeckoDriver launched successfully using auto version detection.")
         except Exception as check_e:
-            add_log(f"[{nickname}] Error after driver initialization, possibly driver launch failure: {check_e}")
-            st.error(f"[{nickname}] Error after driver initialization, possibly driver launch failure: {check_e}")
+            add_log(f"[{nickname}] Error after driver initialization: {check_e}")
+            st.error(f"[{nickname}] Error after driver initialization: {check_e}")
             return
     except Exception as e:
         st.error(f"[{nickname}] Error launching GeckoDriver: {e}")
@@ -172,20 +165,23 @@ def login_to_lms(account, drivers_list):
         driver.get("https://lms.bits-pilani.ac.in/")
         add_log(f"[{nickname}] Waiting for Google login button.")
         wait = WebDriverWait(driver, 10)
-        google_login_button = wait.until(
-            EC.element_to_be_clickable((By.XPATH, "//*[@id='region-main']/div[1]/div[1]/div[1]/div[1]/div[3]/a[1]"))
-        )
+        google_login_button = wait.until(EC.element_to_be_clickable(
+            (By.XPATH, "//*[@id='region-main']/div[1]/div[1]/div[1]/div[1]/div[3]/a[1]")))
         add_log(f"[{nickname}] Google login button found; clicking it.")
         google_login_button.click()
         time.sleep(2)
         add_log(f"[{nickname}] Waiting for email input field.")
-        email_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='email']")))
+        email_field = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='email']")))
         add_log(f"[{nickname}] Entering email: {email}")
+        email_field.click()
         email_field.send_keys(email)
         email_field.send_keys(Keys.RETURN)
         time.sleep(3)
-        add_log(f"[{nickname}] Waiting for password input field.")
-        password_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='password']")))
+        add_log(f"[{nickname}] Waiting for password input field to be clickable.")
+        # Wait until the password field is clickable and then scroll into view, click and send keys
+        password_field = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='password']")))
+        driver.execute_script("arguments[0].scrollIntoView(true);", password_field)
+        password_field.click()
         add_log(f"[{nickname}] Entering password for account {nickname}.")
         password_field.send_keys(password)
         password_field.send_keys(Keys.RETURN)
@@ -204,7 +200,6 @@ def login_to_lms(account, drivers_list):
 # ======================================================
 st.title("BITS LMS Multi-Account Login & QR Redirect App")
 
-# Sidebar Navigation (two pages)
 menu = st.sidebar.radio("Navigation", ["Manage Credentials", "Login & QR Redirect"])
 
 # ----- Manage Credentials Page -----
@@ -234,10 +229,7 @@ if menu == "Manage Credentials":
 
     if credentials:
         st.subheader("Stored Accounts")
-        df = pd.DataFrame([
-            {"Nickname": cred.get("nickname", "Unknown"), "Email": cred["email"]}
-            for cred in credentials
-        ])
+        df = pd.DataFrame([{"Nickname": cred.get("nickname", "Unknown"), "Email": cred["email"]} for cred in credentials])
         st.dataframe(df, use_container_width=True)
 
         st.subheader("Delete an Account")
@@ -257,7 +249,6 @@ elif menu == "Login & QR Redirect":
     st.header("Login to LMS & Redirect via Captured QR Code")
     credentials = load_credentials()
     st.write(f"**Total accounts:** {len(credentials)}")
-
     clear_logs()
 
     if st.button("Start Login Process"):
