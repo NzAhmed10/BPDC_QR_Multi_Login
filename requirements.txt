@@ -8,3 +8,4 @@ numpy
 pandas
 cryptography
 python-dotenv
+streamlit-cookies-manager

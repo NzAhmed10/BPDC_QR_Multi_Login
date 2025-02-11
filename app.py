@@ -1,14 +1,18 @@
 import streamlit as st
+
+# MUST be the very first Streamlit command!
+st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
+
 import json
 import os
 import threading
 import time
 import numpy as np
 from PIL import Image
-import cv2  # Replaced pyzbar with opencv-python
-from cryptography.fernet import Fernet
+import cv2
 import datetime
 import pandas as pd
+from cryptography.fernet import Fernet
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -17,6 +21,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+
+# Import the cookie manager from streamlit-cookies-manager
+from streamlit_cookies_manager import EncryptedCookieManager
 
 # ======================================================
 # Logging Functions
@@ -44,32 +51,52 @@ def clear_logs():
         log.write("")
 
 # ======================================================
-# Credential Encryption and Storage Functions
+# Credential Encryption Setup
 # ======================================================
 
 def load_key():
     """Load encryption key from file or generate one if not present."""
-    if os.path.exists("secret.key"):
-        with open("secret.key", "rb") as key_file:
-            return key_file.read()
+    key_file = "secret.key"
+    if os.path.exists(key_file):
+        with open(key_file, "rb") as f:
+            return f.read()
     else:
         key = Fernet.generate_key()
-        with open("secret.key", "wb") as key_file:
-            key_file.write(key)
+        with open(key_file, "wb") as f:
+            f.write(key)
         return key
 
-key = load_key()
-fernet = Fernet(key)
+FERNET_KEY = load_key()
+fernet = Fernet(FERNET_KEY)
+
+# ======================================================
+# Cookie Manager Setup
+# ======================================================
+# We will store our encrypted credentials in a cookie named "encrypted_credentials"
+COOKIE_NAME = "encrypted_credentials"
+
+cookies = EncryptedCookieManager(
+    prefix="my_app_",
+    password=os.environ.get("COOKIES_PASSWORD", "My secret password")
+)
+
+if not cookies.ready():
+    st.stop()
+
+# ======================================================
+# Credential Storage Functions Using Cookies
+# ======================================================
 
 def load_credentials():
-    """Load and decrypt credentials from local file."""
-    if os.path.exists("credentials.enc"):
-        with open("credentials.enc", "rb") as file:
-            encrypted_data = file.read()
+    """
+    Load and decrypt credentials from the browser cookie.
+    The encrypted JSON string is stored in the cookie.
+    """
+    encrypted_data = cookies.get(COOKIE_NAME)
+    if encrypted_data:
         try:
-            decrypted_data = fernet.decrypt(encrypted_data).decode()
+            decrypted_data = fernet.decrypt(encrypted_data.encode()).decode()
             credentials = json.loads(decrypted_data)
-            # Ensure backward compatibility: add "nickname" if missing
             for cred in credentials:
                 if "nickname" not in cred:
                     cred["nickname"] = "Unknown"
@@ -82,30 +109,25 @@ def load_credentials():
         return []
 
 def save_credentials(credentials):
-    """Encrypt and save credentials to local file."""
+    """
+    Encrypt the credentials and save them in a browser cookie.
+    """
     data_str = json.dumps(credentials)
-    encrypted_data = fernet.encrypt(data_str.encode())
-    with open("credentials.enc", "wb") as file:
-        file.write(encrypted_data)
+    encrypted_data = fernet.encrypt(data_str.encode()).decode()
+    # Use dictionary assignment instead of a non-existent set() method.
+    cookies[COOKIE_NAME] = encrypted_data
+    cookies.save()  # Persist the cookie
 
 # ======================================================
 # QR Code Decoding with OpenCV
 # ======================================================
 
 def decode_qr_code(image):
-    """Decode QR code using OpenCV."""
-    # Convert the image to a numpy array
+    """Decode a QR code from an image using OpenCV."""
     img_array = np.array(image)
-    
-    # Convert to grayscale (required by OpenCV's QR code detector)
     gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
-    
-    # Initialize the QR code detector
     detector = cv2.QRCodeDetector()
-    
-    # Detect and decode the QR code
     data, bbox, _ = detector.detectAndDecode(gray)
-    
     if bbox is not None:
         return data
     return None
@@ -115,13 +137,17 @@ def decode_qr_code(image):
 # ======================================================
 
 def login_to_lms(account, drivers_list):
-    """Log into BITS LMS using Selenium for a single account and add the driver to drivers_list."""
+    """
+    Log into BITS LMS using Selenium for a single account and add the driver to drivers_list.
+    """
     nickname = account.get("nickname", "Unknown")
     email = account["email"]
     password = account["password"]
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
-
+    # Uncomment the next line to run in headless mode:
+    # options.add_argument("--headless")
+    
     try:
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     except Exception as e:
@@ -156,10 +182,9 @@ def login_to_lms(account, drivers_list):
 # Streamlit App Interface
 # ======================================================
 
-st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
 st.title("BITS LMS Multi-Account Login & QR Redirect App")
 
-# Sidebar Navigation (only two pages now)
+# Sidebar Navigation
 menu = st.sidebar.radio("Navigation", ["Manage Credentials", "Login & QR Redirect"])
 
 # ----- Manage Credentials Page -----
@@ -182,7 +207,9 @@ if menu == "Manage Credentials":
                 save_credentials(credentials)
                 log_event(f"New account added: {new_nickname}")
                 st.success("Account added successfully!")
-                st.rerun()
+                # Instead of st.experimental_rerun() (which is missing), use:
+                st.experimental_set_query_params(rerun=str(time.time()))
+                st.stop()
             else:
                 st.error("Please provide all details.")
 
@@ -201,7 +228,8 @@ if menu == "Manage Credentials":
             save_credentials(credentials)
             log_event(f"Deleted account: {delete_option}")
             st.success(f"Deleted account: {delete_option}")
-            st.rerun()
+            st.experimental_set_query_params(rerun=str(time.time()))
+            st.stop()
     else:
         st.info("No accounts stored.")
 
@@ -212,12 +240,12 @@ elif menu == "Login & QR Redirect":
     st.write(f"**Total accounts:** {len(credentials)}")
 
     if st.button("Start Login Process"):
-        clear_logs()  # Clear any logs from previous sessions
+        clear_logs()
         log_event("Starting new login process...")
         if not credentials:
             st.error("No credentials found. Please add credentials first in the 'Manage Credentials' page.")
         else:
-            drivers = []  # This list will store Selenium driver sessions
+            drivers = []
             threads = []
             for account in credentials:
                 t = threading.Thread(target=login_to_lms, args=(account, drivers))
@@ -235,12 +263,8 @@ elif menu == "Login & QR Redirect":
         st.info("Capture a picture of the QR code using your camera.")
         captured_img = st.camera_input("Take a picture of the QR code")
         if captured_img is not None:
-            # Open the captured image using PIL
             image = Image.open(captured_img)
-            
-            # Decode the QR code
             qr_data = decode_qr_code(image)
-            
             if qr_data:
                 st.success(f"QR Code Detected: {qr_data}")
                 if st.button("Redirect All Sessions"):
