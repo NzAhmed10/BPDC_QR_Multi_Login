@@ -1,10 +1,11 @@
 streamlit
 numpy
 opencv-python-headless
-selenium >= 4.11.2
+selenium
 webdriver-manager
 Pillow
 pandas
 cryptography
 python-dotenv
 streamlit-cookies-manager
+chromedriver-py
