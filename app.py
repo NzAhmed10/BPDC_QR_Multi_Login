@@ -6,6 +6,7 @@ import time
 import numpy as np
 from PIL import Image
 import cv2
+from cryptography.fernet import Fernet
 import datetime
 import pandas as pd
 
@@ -17,178 +18,148 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-# MUST be the very first Streamlit command!
-st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
-
-# Import the cookie manager from streamlit-cookies-manager
-from streamlit_cookies_manager import EncryptedCookieManager
-
 # ======================================================
-# Cookie Manager Setup Using st.secrets
+# Logging Functions
 # ======================================================
-COOKIE_PASSWORD = st.secrets.get("COOKIE_PASSWORD", "My secret password")
-COOKIE_NAME = "encrypted_credentials"
 
-cookies = EncryptedCookieManager(prefix="my_app_", password=COOKIE_PASSWORD)
-if not cookies.ready():
-    st.stop()
+LOG_FILE = "app_log.txt"
 
-# ======================================================
-# Ephemeral Logging Functions (Session State Only)
-# ======================================================
-def add_log(message):
-    """Append a log message with a timestamp to session state."""
-    if "logs" not in st.session_state:
-        st.session_state["logs"] = []
+def log_event(message):
+    """Log an important event with a timestamp."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_message = f"[{timestamp}] {message}"
-    st.session_state["logs"].append(log_message)
-    print(f"Log added: {log_message}")  # Debug print to console
+    log_entry = f"[{timestamp}] {message}\n"
+    with open(LOG_FILE, "a") as log:
+        log.write(log_entry)
+
+def load_logs():
+    """Load all log entries."""
+    if os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "r") as log:
+            return log.readlines()
+    return []
 
 def clear_logs():
-    """Clear all logs from session state."""
-    st.session_state["logs"] = []
-    print("Logs cleared")  # Debug print to console
+    """Clear the log file."""
+    with open(LOG_FILE, "w") as log:
+        log.write("")
 
 # ======================================================
-# Credential Encryption Setup (Using st.secrets)
+# Credential Encryption and Storage Functions
 # ======================================================
-FERNET_KEY = st.secrets.get("FERNET_KEY")
-if not FERNET_KEY:
-    st.error("FERNET_KEY is not set in st.secrets. Please add it to your secrets.toml.")
-    st.stop()
 
-from cryptography.fernet import Fernet
-try:
-    fernet = Fernet(FERNET_KEY.encode())
-except Exception as e:
-    st.error("Error initializing encryption. Please check FERNET_KEY in your secrets.")
-    st.stop()
+def load_key():
+    """Load encryption key from file or generate one if not present."""
+    if os.path.exists("secret.key"):
+        with open("secret.key", "rb") as key_file:
+            return key_file.read()
+    else:
+        key = Fernet.generate_key()
+        with open("secret.key", "wb") as key_file:
+            key_file.write(key)
+        return key
 
-# ======================================================
-# Credential Storage Functions Using Cookies
-# ======================================================
+key = load_key()
+fernet = Fernet(key)
+
 def load_credentials():
-    """
-    Load and decrypt credentials from the browser cookie.
-    The encrypted JSON string is stored in the cookie named COOKIE_NAME.
-    """
-    encrypted_data = cookies.get(COOKIE_NAME)
-    if encrypted_data:
+    """Load and decrypt credentials from local file."""
+    if os.path.exists("credentials.enc"):
+        with open("credentials.enc", "rb") as file:
+            encrypted_data = file.read()
         try:
-            decrypted_data = fernet.decrypt(encrypted_data.encode()).decode()
+            decrypted_data = fernet.decrypt(encrypted_data).decode()
             credentials = json.loads(decrypted_data)
+            # Ensure backward compatibility: add "nickname" if missing
             for cred in credentials:
                 if "nickname" not in cred:
                     cred["nickname"] = "Unknown"
-            add_log("Credentials loaded successfully.")
             return credentials
         except Exception as e:
-            add_log(f"Error decrypting credentials: {e}")
+            log_event(f"Error decrypting credentials: {e}")
             st.error("Error decrypting credentials: " + str(e))
             return []
     else:
-        add_log("No credentials found in cookie.")
         return []
 
 def save_credentials(credentials):
-    """
-    Encrypt the credentials and save them in the browser cookie.
-    """
+    """Encrypt and save credentials to local file."""
     data_str = json.dumps(credentials)
-    encrypted_data = fernet.encrypt(data_str.encode()).decode()
-    cookies[COOKIE_NAME] = encrypted_data
-    try:
-        cookies.save()
-        add_log("Credentials saved to cookie successfully.")
-    except Exception as e:
-        st.error("Error saving credentials to cookie: " + str(e))
-        raise
+    encrypted_data = fernet.encrypt(data_str.encode())
+    with open("credentials.enc", "wb") as file:
+        file.write(encrypted_data)
 
 # ======================================================
 # QR Code Decoding with OpenCV
 # ======================================================
+
 def decode_qr_code(image):
-    """Decode a QR code from an image using OpenCV."""
+    """Decode QR code using OpenCV."""
+    # Convert the image to a numpy array
     img_array = np.array(image)
+    
+    # Convert to grayscale (required by OpenCV's QR code detector)
     gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
+    
+    # Initialize the QR code detector
     detector = cv2.QRCodeDetector()
+    
+    # Detect and decode the QR code
     data, bbox, _ = detector.detectAndDecode(gray)
-    if bbox is not None and data:
-        add_log("QR code detected and decoded successfully.")
+    
+    if bbox is not None:
         return data
-    add_log("No QR code detected.")
     return None
 
 # ======================================================
 # Selenium Login Function
 # ======================================================
+
 def login_to_lms(account, drivers_list):
-    """
-    Log into BITS LMS using Selenium for a single account and add the driver to drivers_list.
-    Detailed logs are added for each step.
-    """
+    """Log into BITS LMS using Selenium for a single account and add the driver to drivers_list."""
     nickname = account.get("nickname", "Unknown")
     email = account["email"]
     password = account["password"]
-
-    add_log(f"[{nickname}] Starting login process.")
-    print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")
-
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
-    # options.add_argument("--headless")
-    # options.add_argument("--disable-gpu")
-    # options.add_argument("--no-sandbox")
-    # options.add_argument("--disable-dev-shm-usage")
 
     try:
-        add_log(f"[{nickname}] Launching ChromeDriver.")
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        add_log(f"[{nickname}] ChromeDriver launched successfully.")
     except Exception as e:
-        st.error(f"[{nickname}] Error launching ChromeDriver: {e}")
-        add_log(f"[{nickname}] Error launching ChromeDriver: {e}")
+        st.error(f"Error launching ChromeDriver for {nickname}: {e}")
+        log_event(f"Error launching ChromeDriver for {nickname}: {e}")
         return
 
     drivers_list.append(driver)
-    print(f"drivers_list after append in login_to_lms for {nickname}: {drivers_list}")
-
     try:
-        add_log(f"[{nickname}] Navigating to LMS URL.")
         driver.get("https://lms.bits-pilani.ac.in/")
-        add_log(f"[{nickname}] Waiting for Google login button.")
         wait = WebDriverWait(driver, 10)
         google_login_button = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//*[@id='region-main']/div[1]/div[1]/div[1]/div[1]/div[3]/a[1]"))
         )
-        add_log(f"[{nickname}] Google login button found; clicking it.")
         google_login_button.click()
         time.sleep(2)
-        add_log(f"[{nickname}] Waiting for email input field.")
         email_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='email']")))
-        add_log(f"[{nickname}] Entering email: {email}")
         email_field.send_keys(email)
         email_field.send_keys(Keys.RETURN)
         time.sleep(3)
-        add_log(f"[{nickname}] Waiting for password input field.")
         password_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='password']")))
-        add_log(f"[{nickname}] Entering password for account {nickname}.")
         password_field.send_keys(password)
         password_field.send_keys(Keys.RETURN)
         time.sleep(5)
         st.write(f"✅ {nickname} logged in successfully!")
-        add_log(f"[{nickname}] Login successful.")
+        log_event(f"{nickname} logged in successfully")
     except Exception as e:
-        st.error(f"[{nickname}] Error during login: {e}")
-        add_log(f"[{nickname}] Error during login: {e}")
+        st.write(f"❌ Error logging in for {nickname}: {e}")
+        log_event(f"Error logging in for {nickname}: {e}")
 
 # ======================================================
 # Streamlit App Interface
 # ======================================================
+
+st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
 st.title("BITS LMS Multi-Account Login & QR Redirect App")
 
-# Sidebar Navigation (two pages)
+# Sidebar Navigation (only two pages now)
 menu = st.sidebar.radio("Navigation", ["Manage Credentials", "Login & QR Redirect"])
 
 # ----- Manage Credentials Page -----
@@ -209,10 +180,9 @@ if menu == "Manage Credentials":
                     "password": new_password
                 })
                 save_credentials(credentials)
-                add_log(f"New account added: {new_nickname}")
+                log_event(f"New account added: {new_nickname}")
                 st.success("Account added successfully!")
-                st.experimental_set_query_params(rerun=str(time.time()))
-                st.stop()
+                st.rerun()
             else:
                 st.error("Please provide all details.")
 
@@ -229,10 +199,9 @@ if menu == "Manage Credentials":
         if st.button("Delete Selected Account"):
             credentials = [cred for cred in credentials if cred["nickname"] != delete_option]
             save_credentials(credentials)
-            add_log(f"Deleted account: {delete_option}")
+            log_event(f"Deleted account: {delete_option}")
             st.success(f"Deleted account: {delete_option}")
-            st.experimental_set_query_params(rerun=str(time.time()))
-            st.stop()
+            st.rerun()
     else:
         st.info("No accounts stored.")
 
@@ -242,20 +211,16 @@ elif menu == "Login & QR Redirect":
     credentials = load_credentials()
     st.write(f"**Total accounts:** {len(credentials)}")
 
-    clear_logs()
-
     if st.button("Start Login Process"):
-        add_log("Starting new login process for all accounts.")
-        print(f"Logs after button click: {st.session_state.get('logs')}")
+        clear_logs()  # Clear any logs from previous sessions
+        log_event("Starting new login process...")
         if not credentials:
             st.error("No credentials found. Please add credentials first in the 'Manage Credentials' page.")
         else:
-            drivers = []
+            drivers = []  # This list will store Selenium driver sessions
             threads = []
-            from streamlit.runtime.scriptrunner import add_script_run_ctx
             for account in credentials:
                 t = threading.Thread(target=login_to_lms, args=(account, drivers))
-                add_script_run_ctx(t)
                 threads.append(t)
                 t.start()
             for t in threads:
@@ -263,36 +228,40 @@ elif menu == "Login & QR Redirect":
             st.session_state["drivers"] = drivers
             st.success("All accounts are logged in!")
             st.write(f"**Number of active sessions:** {len(drivers)}")
-            add_log("All accounts logged in successfully.")
-            print(f"Logs after login threads join: {st.session_state.get('logs')}")
+            log_event("All accounts logged in successfully.")
 
     if "drivers" in st.session_state:
         st.subheader("QR Code Scanner via Camera")
         st.info("Capture a picture of the QR code using your camera.")
         captured_img = st.camera_input("Take a picture of the QR code")
         if captured_img is not None:
+            # Open the captured image using PIL
             image = Image.open(captured_img)
+            
+            # Decode the QR code
             qr_data = decode_qr_code(image)
+            
             if qr_data:
                 st.success(f"QR Code Detected: {qr_data}")
-                st.info(f"Redirecting all sessions to: {qr_data}")
-                for driver in st.session_state["drivers"]:
-                    try:
-                        driver.get(qr_data)
-                    except Exception as e:
-                        st.error(f"Error redirecting one session: {e}")
-                add_log(f"Redirected all sessions to {qr_data}")
-                st.success("All sessions redirected successfully!")
+                if st.button("Redirect All Sessions"):
+                    for driver in st.session_state["drivers"]:
+                        try:
+                            driver.get(qr_data)
+                        except Exception as e:
+                            st.write(f"Error redirecting one session: {e}")
+                    log_event(f"Redirected all sessions to {qr_data}")
+                    st.success("All sessions redirected successfully!")
             else:
                 st.info("No QR code detected in the captured image. Please try again.")
 
     st.subheader("Logs (New Session)")
-    if "logs" in st.session_state and st.session_state["logs"]:
-        for log in st.session_state["logs"]:
-            st.text(log)
+    logs = load_logs()
+    if logs:
+        st.text("".join(logs))
     else:
         st.info("No logs available.")
 
+# ----- Sidebar: Close All Sessions Button -----
 if st.sidebar.button("Close All Sessions"):
     if "drivers" in st.session_state:
         for driver in st.session_state["drivers"]:
@@ -301,7 +270,7 @@ if st.sidebar.button("Close All Sessions"):
             except Exception:
                 pass
         del st.session_state["drivers"]
-        add_log("Closed all sessions.")
+        log_event("Closed all sessions.")
         st.success("All sessions closed!")
     else:
         st.info("No active sessions to close.")
