@@ -44,12 +44,12 @@ def add_log(message):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_message = f"[{timestamp}] {message}"
     st.session_state["logs"].append(log_message)
-    print(f"Log added: {log_message}") # Debug print to console
+    print(f"Log added: {log_message}")  # Debug print to console
 
 def clear_logs():
     """Clear all logs from session state."""
     st.session_state["logs"] = []
-    print("Logs cleared") # Debug print to console
+    print("Logs cleared")  # Debug print to console
 
 # ======================================================
 # Credential Encryption Setup (Using st.secrets)
@@ -135,7 +135,7 @@ def login_to_lms(account, drivers_list):
     password = account["password"]
 
     add_log(f"[{nickname}] Starting login process.")
-    print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}") # Debug print
+    print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")  # Debug print
 
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
@@ -153,7 +153,7 @@ def login_to_lms(account, drivers_list):
         return
 
     drivers_list.append(driver)
-    print(f"drivers_list after append in login_to_lms for {nickname}: {drivers_list}") # Debug print
+    print(f"drivers_list after append in login_to_lms for {nickname}: {drivers_list}")  # Debug print
 
     try:
         add_log(f"[{nickname}] Navigating to LMS URL.")
@@ -252,14 +252,18 @@ elif menu == "Login & QR Redirect":
 
     if st.button("Start Login Process"):
         add_log("Starting new login process for all accounts.")
-        print(f"Logs after button click: {st.session_state.get('logs')}") # Debug print
+        print(f"Logs after button click: {st.session_state.get('logs')}")  # Debug print
         if not credentials:
             st.error("No credentials found. Please add credentials first in the 'Manage Credentials' page.")
         else:
             drivers = []
             threads = []
+            # Import add_script_run_ctx from Streamlit runtime.
+            from streamlit.runtime.scriptrunner import add_script_run_ctx
             for account in credentials:
                 t = threading.Thread(target=login_to_lms, args=(account, drivers))
+                # Attach the current ScriptRunContext to the thread to suppress the warning.
+                add_script_run_ctx(t)
                 threads.append(t)
                 t.start()
             for t in threads:
@@ -268,7 +272,7 @@ elif menu == "Login & QR Redirect":
             st.success("All accounts are logged in!")
             st.write(f"**Number of active sessions:** {len(drivers)}")
             add_log("All accounts logged in successfully.")
-            print(f"Logs after login threads join: {st.session_state.get('logs')}") # Debug print
+            print(f"Logs after login threads join: {st.session_state.get('logs')}")  # Debug print
 
     if "drivers" in st.session_state:
         st.subheader("QR Code Scanner via Camera")
@@ -280,7 +284,7 @@ elif menu == "Login & QR Redirect":
             if qr_data:
                 st.success(f"QR Code Detected: {qr_data}")
                 # --- Immediate Redirect ---
-                st.info(f"Redirecting all sessions to: {qr_data}") # Inform user about redirection
+                st.info(f"Redirecting all sessions to: {qr_data}")  # Inform user about redirection
                 for driver in st.session_state["drivers"]:
                     try:
                         driver.get(qr_data)
@@ -288,13 +292,12 @@ elif menu == "Login & QR Redirect":
                         st.error(f"Error redirecting one session: {e}")
                 add_log(f"Redirected all sessions to {qr_data}")
                 st.success("All sessions redirected successfully!")
-                # --- Removed Redirect Button ---
             else:
                 st.info("No QR code detected in the captured image. Please try again.")
 
     st.subheader("Logs (New Session)")
     if "logs" in st.session_state and st.session_state["logs"]:
-        for log in st.session_state["logs"]: # Correct way to display logs
+        for log in st.session_state["logs"]:
             st.text(log)
     else:
         st.info("No logs available.")
