@@ -145,13 +145,13 @@ def login_to_lms(account, drivers_list):
     options.add_argument("--disable-dev-shm-usage")
     
     # Linux-specific: set binary location if running on a posix system.
-    if os.name == 'posix':
-        if os.path.exists("/usr/bin/google-chrome"):
-            options.binary_location = "/usr/bin/google-chrome"
-        elif os.path.exists("/usr/bin/chromium-browser"):
-            options.binary_location = "/usr/bin/chromium-browser"
-        elif os.path.exists("/usr/bin/chromium"):
-            options.binary_location = "/usr/bin/chromium"
+    # if os.name == 'posix':
+    #     if os.path.exists("/usr/bin/google-chrome"):
+    #         options.binary_location = "/usr/bin/google-chrome"
+    #     elif os.path.exists("/usr/bin/chromium-browser"):
+    #         options.binary_location = "/usr/bin/chromium-browser"
+    #     elif os.path.exists("/usr/bin/chromium"):
+    #         options.binary_location = "/usr/bin/chromium"
 
     try:
         add_log(f"[{nickname}] Launching ChromeDriver.")
