@@ -17,6 +17,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.os_manager import ChromeType
+from selenium.webdriver.chrome.service import Service as ChromiumService
+
+
 import subprocess  # Import subprocess
 
 # MUST be the very first Streamlit command!
@@ -150,7 +154,10 @@ def login_to_lms(account, drivers_list):
         # driver_path = ChromeDriverManager().install()
         # service = Service(driver_path)
         # driver = webdriver.Chrome(service=service, options=options)
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),options=options)
+
+        # driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),options=options)
+        driver = webdriver.Chrome(service=ChromiumService(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()))
+
 
         # Check if driver was launched successfully (basic check)
         try:
