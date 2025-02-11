@@ -123,7 +123,7 @@ def decode_qr_code(image):
     return None
 
 # ======================================================
-# Selenium Login Function using Firefox with modified password handling
+# Selenium Login Function using Firefox with improved password handling
 # ======================================================
 def login_to_lms(account, drivers_list):
     nickname = account.get("nickname", "Unknown")
@@ -144,9 +144,8 @@ def login_to_lms(account, drivers_list):
         driver_path = GeckoDriverManager().install()
         service = Service(driver_path)
         driver = webdriver.Firefox(service=service, options=options)
-
         try:
-            _ = driver.title  # Basic check
+            _ = driver.title  # Basic check to ensure driver is running
             add_log(f"[{nickname}] GeckoDriver launched successfully using auto version detection.")
         except Exception as check_e:
             add_log(f"[{nickname}] Error after driver initialization: {check_e}")
@@ -178,13 +177,21 @@ def login_to_lms(account, drivers_list):
         email_field.send_keys(Keys.RETURN)
         time.sleep(3)
         add_log(f"[{nickname}] Waiting for password input field to be clickable.")
-        # Wait until the password field is clickable and then scroll into view, click and send keys
         password_field = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='password']")))
         driver.execute_script("arguments[0].scrollIntoView(true);", password_field)
-        password_field.click()
-        add_log(f"[{nickname}] Entering password for account {nickname}.")
-        password_field.send_keys(password)
-        password_field.send_keys(Keys.RETURN)
+        try:
+            # Try the normal method first
+            password_field.click()
+            add_log(f"[{nickname}] Attempting to send password keys normally.")
+            password_field.send_keys(password)
+            password_field.send_keys(Keys.RETURN)
+        except Exception as send_err:
+            add_log(f"[{nickname}] Normal send_keys failed: {send_err}. Falling back to JS setting.")
+            # Fallback: use JavaScript to set the password value
+            driver.execute_script("arguments[0].value = arguments[1];", password_field, password)
+            # Trigger an event if needed
+            driver.execute_script("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", password_field)
+            password_field.send_keys(Keys.RETURN)
         time.sleep(5)
         st.write(f"✅ {nickname} logged in successfully!")
         add_log(f"[{nickname}] Login successful.")
