@@ -142,7 +142,15 @@ def login_to_lms(account, drivers_list):
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-
+    
+    # Linux-specific: set binary location if running on a posix system
+    if os.name == 'posix':
+        if os.path.exists("/usr/bin/google-chrome"):
+            options.binary_location = "/usr/bin/google-chrome"
+        elif os.path.exists("/usr/bin/chromium-browser"):
+            options.binary_location = "/usr/bin/chromium-browser"
+        elif os.path.exists("/usr/bin/chromium"):
+            options.binary_location = "/usr/bin/chromium"
 
     try:
         add_log(f"[{nickname}] Launching ChromeDriver.")
@@ -159,7 +167,6 @@ def login_to_lms(account, drivers_list):
     try:
         add_log(f"[{nickname}] Navigating to LMS URL.")
         driver.get("https://lms.bits-pilani.ac.in/")
-
         add_log(f"[{nickname}] Waiting for Google login button.")
         wait = WebDriverWait(driver, 10)
         google_login_button = wait.until(
@@ -167,21 +174,18 @@ def login_to_lms(account, drivers_list):
         )
         add_log(f"[{nickname}] Google login button found; clicking it.")
         google_login_button.click()
-
         time.sleep(2)
         add_log(f"[{nickname}] Waiting for email input field.")
         email_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='email']")))
         add_log(f"[{nickname}] Entering email: {email}")
         email_field.send_keys(email)
         email_field.send_keys(Keys.RETURN)
-
         time.sleep(3)
         add_log(f"[{nickname}] Waiting for password input field.")
         password_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='password']")))
         add_log(f"[{nickname}] Entering password for account {nickname}.")
         password_field.send_keys(password)
         password_field.send_keys(Keys.RETURN)
-
         time.sleep(5)
         st.write(f"✅ {nickname} logged in successfully!")
         add_log(f"[{nickname}] Login successful.")
@@ -284,8 +288,7 @@ elif menu == "Login & QR Redirect":
             qr_data = decode_qr_code(image)
             if qr_data:
                 st.success(f"QR Code Detected: {qr_data}")
-                # --- Immediate Redirect ---
-                st.info(f"Redirecting all sessions to: {qr_data}")  # Inform user about redirection
+                st.info(f"Redirecting all sessions to: {qr_data}")
                 for driver in st.session_state["drivers"]:
                     try:
                         driver.get(qr_data)
