@@ -16,7 +16,6 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-import subprocess  # Import subprocess
 
 # MUST be the very first Streamlit command!
 st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
@@ -137,28 +136,15 @@ def login_to_lms(account, drivers_list):
     print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")
 
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+    # options.add_argument("--headless")
+    # options.add_argument("--disable-gpu")
+    # options.add_argument("--no-sandbox")
+    # options.add_argument("--disable-dev-shm-usage")
 
     try:
-        add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
-        # Specify a specific version of ChromeDriver that is known to be stable.
-        # You might need to adjust this version based on compatibility with your Chrome/Chromium version.
-        driver_path = ChromeDriverManager(version="114.0.5735.90").install() # Specify version
-        service = Service(driver_path)
-        driver = webdriver.Chrome(service=service, options=options)
-
-        # Check if driver was launched successfully (basic check)
-        try:
-            driver.title # Accessing title should cause error if driver is not properly initialized
-            add_log(f"[{nickname}] ChromeDriver launched successfully, version: 114.0.5735.90.")
-        except Exception as check_e:
-            add_log(f"[{nickname}] Error after driver initialization, possibly driver launch failure: {check_e}")
-            st.error(f"[{nickname}] Error after driver initialization, possibly driver launch failure: {check_e}")
-            return # Exit if even basic check fails
-
+        add_log(f"[{nickname}] Launching ChromeDriver.")
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        add_log(f"[{nickname}] ChromeDriver launched successfully.")
     except Exception as e:
         st.error(f"[{nickname}] Error launching ChromeDriver: {e}")
         add_log(f"[{nickname}] Error launching ChromeDriver: {e}")
@@ -193,11 +179,8 @@ def login_to_lms(account, drivers_list):
         st.write(f"✅ {nickname} logged in successfully!")
         add_log(f"[{nickname}] Login successful.")
     except Exception as e:
-        st.error(f"[{nickname}] Error during login after driver launch: {e}")
-        add_log(f"[{nickname}] Error during login after driver launch: {e}")
-        if driver: # Ensure driver is quit even if login fails after launch
-            driver.quit()
-            drivers_list.remove(driver) # Remove the driver if login failed.
+        st.error(f"[{nickname}] Error during login: {e}")
+        add_log(f"[{nickname}] Error during login: {e}")
 
 # ======================================================
 # Streamlit App Interface
