@@ -138,10 +138,11 @@ def login_to_lms(account, drivers_list):
     print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")  # Debug print
 
     options = webdriver.ChromeOptions()
-    options.add_argument("--start-maximized")
-    # Headless mode for production:
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
 
     try:
         add_log(f"[{nickname}] Launching ChromeDriver.")
