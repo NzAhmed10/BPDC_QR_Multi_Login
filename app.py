@@ -8,7 +8,6 @@ from PIL import Image
 import cv2
 import datetime
 import pandas as pd
-import shutil  # Added for file operations
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -27,7 +26,6 @@ from streamlit_cookies_manager import EncryptedCookieManager
 # ======================================================
 # Cookie Manager Setup Using st.secrets
 # ======================================================
-# Retrieve the cookie password from st.secrets.
 COOKIE_PASSWORD = st.secrets.get("COOKIE_PASSWORD", "My secret password")
 COOKIE_NAME = "encrypted_credentials"
 
@@ -99,7 +97,6 @@ def save_credentials(credentials):
     """
     data_str = json.dumps(credentials)
     encrypted_data = fernet.encrypt(data_str.encode()).decode()
-    # Use dictionary assignment instead of a non-existent set() method.
     cookies[COOKIE_NAME] = encrypted_data
     try:
         cookies.save()
@@ -136,39 +133,17 @@ def login_to_lms(account, drivers_list):
     password = account["password"]
 
     add_log(f"[{nickname}] Starting login process.")
-    print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")  # Debug print
+    print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")
 
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    
-    # Linux-specific: set binary location if running on a posix system.
-    # if os.name == 'posix':
-    #     if os.path.exists("/usr/bin/google-chrome"):
-    #         options.binary_location = "/usr/bin/google-chrome"
-    #     elif os.path.exists("/usr/bin/chromium-browser"):
-    #         options.binary_location = "/usr/bin/chromium-browser"
-    #     elif os.path.exists("/usr/bin/chromium"):
-    #         options.binary_location = "/usr/bin/chromium"
 
     try:
         add_log(f"[{nickname}] Launching ChromeDriver.")
-        # Attempt to download and install ChromeDriver
-        try:
-            driver_path = ChromeDriverManager().install()
-        except Exception as e:
-            # If the error message indicates the downloaded file is not a zip file, remove the corrupted directory and retry.
-            if "not a zip file" in str(e).lower():
-                corrupted_dir = os.path.join(os.path.expanduser("~/.wdm/drivers/chromedriver/linux64/114.0.5735.90"))
-                if os.path.exists(corrupted_dir):
-                    add_log(f"[{nickname}] Removing corrupted ChromeDriver directory: {corrupted_dir}")
-                    shutil.rmtree(corrupted_dir)
-                driver_path = ChromeDriverManager().install()
-            else:
-                raise
-        driver = webdriver.Chrome(service=Service(driver_path), options=options)
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         add_log(f"[{nickname}] ChromeDriver launched successfully.")
     except Exception as e:
         st.error(f"[{nickname}] Error launching ChromeDriver: {e}")
@@ -176,7 +151,7 @@ def login_to_lms(account, drivers_list):
         return
 
     drivers_list.append(driver)
-    print(f"drivers_list after append in login_to_lms for {nickname}: {drivers_list}")  # Debug print
+    print(f"drivers_list after append in login_to_lms for {nickname}: {drivers_list}")
 
     try:
         add_log(f"[{nickname}] Navigating to LMS URL.")
@@ -266,22 +241,19 @@ elif menu == "Login & QR Redirect":
     credentials = load_credentials()
     st.write(f"**Total accounts:** {len(credentials)}")
 
-    # Clear ephemeral logs for new session.
     clear_logs()
 
     if st.button("Start Login Process"):
         add_log("Starting new login process for all accounts.")
-        print(f"Logs after button click: {st.session_state.get('logs')}")  # Debug print
+        print(f"Logs after button click: {st.session_state.get('logs')}")
         if not credentials:
             st.error("No credentials found. Please add credentials first in the 'Manage Credentials' page.")
         else:
             drivers = []
             threads = []
-            # Import add_script_run_ctx from Streamlit runtime.
             from streamlit.runtime.scriptrunner import add_script_run_ctx
             for account in credentials:
                 t = threading.Thread(target=login_to_lms, args=(account, drivers))
-                # Attach the current ScriptRunContext to the thread to suppress the warning.
                 add_script_run_ctx(t)
                 threads.append(t)
                 t.start()
@@ -291,7 +263,7 @@ elif menu == "Login & QR Redirect":
             st.success("All accounts are logged in!")
             st.write(f"**Number of active sessions:** {len(drivers)}")
             add_log("All accounts logged in successfully.")
-            print(f"Logs after login threads join: {st.session_state.get('logs')}")  # Debug print
+            print(f"Logs after login threads join: {st.session_state.get('logs')}")
 
     if "drivers" in st.session_state:
         st.subheader("QR Code Scanner via Camera")
@@ -320,7 +292,6 @@ elif menu == "Login & QR Redirect":
     else:
         st.info("No logs available.")
 
-# ----- Sidebar: Close All Sessions Button -----
 if st.sidebar.button("Close All Sessions"):
     if "drivers" in st.session_state:
         for driver in st.session_state["drivers"]:
