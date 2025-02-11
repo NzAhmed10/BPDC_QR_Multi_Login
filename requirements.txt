@@ -1,8 +1,7 @@
 streamlit
 numpy
 opencv-python-headless
-selenium
-seleniumbase
+selenium >= 4.11.2
 webdriver-manager
 Pillow
 pandas
