@@ -136,6 +136,7 @@ def login_to_lms(account, drivers_list):
     print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")
 
     options = webdriver.ChromeOptions()
+    options.add_argument("--start-maximized")
     # options.add_argument("--headless")
     # options.add_argument("--disable-gpu")
     # options.add_argument("--no-sandbox")
