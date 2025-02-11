@@ -4,7 +4,6 @@ opencv-python-headless
 selenium
 webdriver-manager
 Pillow
-numpy
 pandas
 cryptography
 python-dotenv
