@@ -144,13 +144,21 @@ def login_to_lms(account, drivers_list):
     add_log(f"[{nickname}] Starting login process.")
     print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")
 
+    # options = webdriver.ChromeOptions()
+    # options.add_argument("--start-maximized")
+    # options.add_argument("--headless=new")
+    # options.add_argument("--disable-gpu")
+    # options.add_argument("--no-sandbox")
+    # options.add_argument("--disable-dev-shm-usage")
+    # options.add_argument("--remote-debugging-port=9222")
     options = webdriver.ChromeOptions()
-    options.add_argument("--start-maximized")
-    options.add_argument("--headless")
+    options.add_argument("--headless=new")  # Try using the new headless mode
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--remote-debugging-port=9222")
+    options.add_argument("--window-size=1920,1080")  # Explicit window size for headless mode
+
 
     try:
         add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
