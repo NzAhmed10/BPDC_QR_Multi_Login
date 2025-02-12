@@ -12,11 +12,12 @@ import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-import subprocess  # Import subprocess
+import subprocess
 
 # MUST be the very first Streamlit command!
 st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
@@ -44,12 +45,12 @@ def add_log(message):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_message = f"[{timestamp}] {message}"
     st.session_state["logs"].append(log_message)
-    print(f"Log added: {log_message}")  # Debug print to console
+    print(f"Log added: {log_message}")
 
 def clear_logs():
     """Clear all logs from session state."""
     st.session_state["logs"] = []
-    print("Logs cleared")  # Debug print to console
+    print("Logs cleared")
 
 # ======================================================
 # Credential Encryption Setup (Using st.secrets)
@@ -72,7 +73,6 @@ except Exception as e:
 def load_credentials():
     """
     Load and decrypt credentials from the browser cookie.
-    The encrypted JSON string is stored in the cookie named COOKIE_NAME.
     """
     encrypted_data = cookies.get(COOKIE_NAME)
     if encrypted_data:
@@ -122,98 +122,86 @@ def decode_qr_code(image):
     return None
 
 # ======================================================
-# Selenium Login Function
+# Selenium Login Function (Updated)
 # ======================================================
 def login_to_lms(account, drivers_list):
-    """
-    Log into BITS LMS using Selenium for a single account and add the driver to drivers_list.
-    Detailed logs are added for each step.
-    """
     nickname = account.get("nickname", "Unknown")
     email = account["email"]
     password = account["password"]
 
     add_log(f"[{nickname}] Starting login process.")
-    print(f"drivers_list before append in login_to_lms for {nickname}: {drivers_list}")
-
-    options = webdriver.ChromeOptions()
+    
+    # Set up Chrome options with headless mode and a fixed window size.
+    options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-
+    options.add_argument("--window-size=1920,1080")
+    
     try:
         add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
-        #  Remove the version argument here. ChromeDriverManager will by default
-        #  try to download the latest compatible version.
-
-        #driver_path = ChromeDriverManager().install()
-        #service = Service(driver_path)
-        #driver = webdriver.Chrome(service=service, options=options)
         driver = webdriver.Chrome(options=options)
-
-        # Check if driver was launched successfully (basic check)
-        try:
-            driver.title # Accessing title should cause error if driver is not properly initialized
-            add_log(f"[{nickname}] ChromeDriver launched successfully using auto version detection.") # Modified log message
-        except Exception as check_e:
-            add_log(f"[{nickname}] Error after driver initialization, possibly driver launch failure: {check_e}")
-            st.error(f"[{nickname}] Error after driver initialization, possibly driver launch failure: {check_e}")
-            return # Exit if even basic check fails
-
+        # Basic check to ensure driver is running
+        _ = driver.title
+        add_log(f"[{nickname}] ChromeDriver launched successfully using auto version detection.")
     except Exception as e:
         st.error(f"[{nickname}] Error launching ChromeDriver: {e}")
         add_log(f"[{nickname}] Error launching ChromeDriver: {e}")
         return
 
     drivers_list.append(driver)
-    print(f"drivers_list after append in login_to_lms for {nickname}: {drivers_list}")
 
     try:
         add_log(f"[{nickname}] Navigating to LMS URL.")
         driver.get("https://lms.bits-pilani.ac.in/")
+        wait = WebDriverWait(driver, 15)
+        
         add_log(f"[{nickname}] Waiting for Google login button.")
-        wait = WebDriverWait(driver, 10)
         google_login_button = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//*[@id='region-main']/div[1]/div[1]/div[1]/div[1]/div[3]/a[1]"))
         )
         add_log(f"[{nickname}] Google login button found; clicking it.")
-        google_login_button.click()
+        # Use JavaScript click for robustness in headless mode
+        driver.execute_script("arguments[0].click();", google_login_button)
         time.sleep(2)
+        
         add_log(f"[{nickname}] Waiting for email input field.")
-        email_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='email']")))
+        email_field = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='email']")))
+        # Scroll into view to ensure interactivity
+        driver.execute_script("arguments[0].scrollIntoView(true);", email_field)
         add_log(f"[{nickname}] Entering email: {email}")
         email_field.send_keys(email)
         email_field.send_keys(Keys.RETURN)
         time.sleep(3)
+        
         add_log(f"[{nickname}] Waiting for password input field.")
-        password_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='password']")))
+        password_field = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='password']")))
+        driver.execute_script("arguments[0].scrollIntoView(true);", password_field)
         add_log(f"[{nickname}] Entering password for account {nickname}.")
         password_field.send_keys(password)
         password_field.send_keys(Keys.RETURN)
         time.sleep(5)
+        
         st.write(f"✅ {nickname} logged in successfully!")
         add_log(f"[{nickname}] Login successful.")
     except Exception as e:
         st.error(f"[{nickname}] Error during login after driver launch: {e}")
         add_log(f"[{nickname}] Error during login after driver launch: {e}")
-        if driver: # Ensure driver is quit even if login fails after launch
+        if driver:
             driver.quit()
-            drivers_list.remove(driver) # Remove the driver if login failed.
+            drivers_list.remove(driver)
 
 # ======================================================
 # Streamlit App Interface
 # ======================================================
 st.title("BITS LMS Multi-Account Login & QR Redirect App")
-
-# Sidebar Navigation (two pages)
 menu = st.sidebar.radio("Navigation", ["Manage Credentials", "Login & QR Redirect"])
 
 # ----- Manage Credentials Page -----
 if menu == "Manage Credentials":
     st.header("Manage Gmail Credentials")
     credentials = load_credentials()
-
     with st.form("add_account_form"):
         new_nickname = st.text_input("Nickname (e.g., 'Personal', 'Work')")
         new_email = st.text_input("Gmail")
@@ -233,15 +221,10 @@ if menu == "Manage Credentials":
                 st.stop()
             else:
                 st.error("Please provide all details.")
-
     if credentials:
         st.subheader("Stored Accounts")
-        df = pd.DataFrame([
-            {"Nickname": cred.get("nickname", "Unknown"), "Email": cred["email"]}
-            for cred in credentials
-        ])
+        df = pd.DataFrame([{"Nickname": cred.get("nickname", "Unknown"), "Email": cred["email"]} for cred in credentials])
         st.dataframe(df, use_container_width=True)
-
         st.subheader("Delete an Account")
         delete_option = st.selectbox("Select account to delete", options=[cred["nickname"] for cred in credentials])
         if st.button("Delete Selected Account"):
@@ -259,12 +242,9 @@ elif menu == "Login & QR Redirect":
     st.header("Login to LMS & Redirect via Captured QR Code")
     credentials = load_credentials()
     st.write(f"**Total accounts:** {len(credentials)}")
-
     clear_logs()
-
     if st.button("Start Login Process"):
         add_log("Starting new login process for all accounts.")
-        print(f"Logs after button click: {st.session_state.get('logs')}")
         if not credentials:
             st.error("No credentials found. Please add credentials first in the 'Manage Credentials' page.")
         else:
@@ -282,8 +262,6 @@ elif menu == "Login & QR Redirect":
             st.success("All accounts are logged in!")
             st.write(f"**Number of active sessions:** {len(drivers)}")
             add_log("All accounts logged in successfully.")
-            print(f"Logs after login threads join: {st.session_state.get('logs')}")
-
     if "drivers" in st.session_state:
         st.subheader("QR Code Scanner via Camera")
         st.info("Capture a picture of the QR code using your camera.")
@@ -303,7 +281,6 @@ elif menu == "Login & QR Redirect":
                 st.success("All sessions redirected successfully!")
             else:
                 st.info("No QR code detected in the captured image. Please try again.")
-
     st.subheader("Logs (New Session)")
     if "logs" in st.session_state and st.session_state["logs"]:
         for log in st.session_state["logs"]:
