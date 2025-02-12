@@ -15,7 +15,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-# Note: webdriver_manager is no longer used since we use a local driver
+# Note: webdriver_manager is no longer used since we use a local driver.
 
 # MUST be the very first Streamlit command!
 st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
@@ -140,9 +140,12 @@ def login_to_lms(account, drivers_list):
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-
-    # --- CHANGED: Use local driver from working directory ---
-    # The driver file "chromdriver" (make sure it is executable) is located in the working directory.
+    
+    # NOTE: This code assumes that a Chrome browser is installed and available in the PATH.
+    # If not, you must install Chrome/Chromium or specify its location using:
+    # options.binary_location = "path/to/chrome"
+    
+    # --- CHANGED: Use local ChromeDriver from working directory ---
     local_driver_path = os.path.join(os.getcwd(), "chromdriver")
     try:
         add_log(f"[{nickname}] Launching ChromeDriver from local path: {local_driver_path}")
