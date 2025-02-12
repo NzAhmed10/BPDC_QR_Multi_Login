@@ -140,6 +140,7 @@ def login_to_lms(account, drivers_list):
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.binary_location = "/usr/bin/chromium-browser"
     
     # NOTE: This code now uses the local ChromeDriver.
     local_driver_path = os.path.join(os.getcwd(), "chromdriver")
