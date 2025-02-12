@@ -8,6 +8,7 @@ from PIL import Image
 import cv2
 import datetime
 import pandas as pd
+import traceback
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -17,7 +18,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-import subprocess
+import subprocess  # Import subprocess
 
 # MUST be the very first Streamlit command!
 st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
@@ -73,6 +74,7 @@ except Exception as e:
 def load_credentials():
     """
     Load and decrypt credentials from the browser cookie.
+    The encrypted JSON string is stored in the cookie named COOKIE_NAME.
     """
     encrypted_data = cookies.get(COOKIE_NAME)
     if encrypted_data:
@@ -122,7 +124,7 @@ def decode_qr_code(image):
     return None
 
 # ======================================================
-# Selenium Login Function (Updated)
+# Selenium Login Function (Enhanced Exception Logging)
 # ======================================================
 def login_to_lms(account, drivers_list):
     nickname = account.get("nickname", "Unknown")
@@ -131,7 +133,6 @@ def login_to_lms(account, drivers_list):
 
     add_log(f"[{nickname}] Starting login process.")
     
-    # Set up Chrome options with headless mode and a fixed window size.
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
@@ -142,7 +143,6 @@ def login_to_lms(account, drivers_list):
     try:
         add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
         driver = webdriver.Chrome(options=options)
-        # Basic check to ensure driver is running
         _ = driver.title
         add_log(f"[{nickname}] ChromeDriver launched successfully using auto version detection.")
     except Exception as e:
@@ -162,13 +162,11 @@ def login_to_lms(account, drivers_list):
             EC.element_to_be_clickable((By.XPATH, "//*[@id='region-main']/div[1]/div[1]/div[1]/div[1]/div[3]/a[1]"))
         )
         add_log(f"[{nickname}] Google login button found; clicking it.")
-        # Use JavaScript click for robustness in headless mode
         driver.execute_script("arguments[0].click();", google_login_button)
         time.sleep(2)
         
         add_log(f"[{nickname}] Waiting for email input field.")
         email_field = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='email']")))
-        # Scroll into view to ensure interactivity
         driver.execute_script("arguments[0].scrollIntoView(true);", email_field)
         add_log(f"[{nickname}] Entering email: {email}")
         email_field.send_keys(email)
@@ -186,8 +184,10 @@ def login_to_lms(account, drivers_list):
         st.write(f"✅ {nickname} logged in successfully!")
         add_log(f"[{nickname}] Login successful.")
     except Exception as e:
-        st.error(f"[{nickname}] Error during login after driver launch: {e}")
-        add_log(f"[{nickname}] Error during login after driver launch: {e}")
+        tb = traceback.format_exc()
+        error_message = f"[{nickname}] Error during login after driver launch: {e}\nTraceback:\n{tb}"
+        st.error(error_message)
+        add_log(error_message)
         if driver:
             driver.quit()
             drivers_list.remove(driver)
