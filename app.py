@@ -124,7 +124,7 @@ def decode_qr_code(image):
     return None
 
 # ======================================================
-# Selenium Login Function (Enhanced Exception Logging)
+# Selenium Login Function (Modified Wait for Password Field)
 # ======================================================
 def login_to_lms(account, drivers_list):
     nickname = account.get("nickname", "Unknown")
@@ -134,16 +134,16 @@ def login_to_lms(account, drivers_list):
     add_log(f"[{nickname}] Starting login process.")
     
     options = Options()
-    options.add_argument("--headless")
+    #options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920,1080")
+    #options.add_argument("--window-size=1920,1080")
     
     try:
         add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
         driver = webdriver.Chrome(options=options)
-        _ = driver.title
+        _ = driver.title  # Basic check for driver launch
         add_log(f"[{nickname}] ChromeDriver launched successfully using auto version detection.")
     except Exception as e:
         st.error(f"[{nickname}] Error launching ChromeDriver: {e}")
@@ -155,7 +155,8 @@ def login_to_lms(account, drivers_list):
     try:
         add_log(f"[{nickname}] Navigating to LMS URL.")
         driver.get("https://lms.bits-pilani.ac.in/")
-        wait = WebDriverWait(driver, 15)
+        # Increase timeout to 30 seconds to account for slower transitions
+        wait = WebDriverWait(driver, 30)
         
         add_log(f"[{nickname}] Waiting for Google login button.")
         google_login_button = wait.until(
@@ -174,7 +175,8 @@ def login_to_lms(account, drivers_list):
         time.sleep(3)
         
         add_log(f"[{nickname}] Waiting for password input field.")
-        password_field = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='password']")))
+        # Change condition from clickable to visible for the password field
+        password_field = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@type='password']")))
         driver.execute_script("arguments[0].scrollIntoView(true);", password_field)
         add_log(f"[{nickname}] Entering password for account {nickname}.")
         password_field.send_keys(password)
