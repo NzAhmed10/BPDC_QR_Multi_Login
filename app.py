@@ -15,7 +15,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-# Removed webdriver_manager since we now use a local driver
+# Note: webdriver_manager is no longer used since we use a local driver
 
 # MUST be the very first Streamlit command!
 st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
@@ -43,12 +43,12 @@ def add_log(message):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_message = f"[{timestamp}] {message}"
     st.session_state["logs"].append(log_message)
-    print(f"Log added: {log_message}")  # Debug print
+    print(f"Log added: {log_message}")
 
 def clear_logs():
     """Clear all logs from session state."""
     st.session_state["logs"] = []
-    print("Logs cleared")  # Debug print
+    print("Logs cleared")
 
 # ======================================================
 # Credential Encryption Setup (Using st.secrets)
@@ -141,9 +141,9 @@ def login_to_lms(account, drivers_list):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    # --- CHANGED: Use local unzipped ChromeDriver ---
-    # Assume that the chromedriver binary is in the "chromedriver-linux64" directory
-    local_driver_path = os.path.join(os.getcwd(), "chromedriver-linux64", "chromedriver")
+    # --- CHANGED: Use local driver from working directory ---
+    # The driver file "chromdriver" (make sure it is executable) is located in the working directory.
+    local_driver_path = os.path.join(os.getcwd(), "chromdriver")
     try:
         add_log(f"[{nickname}] Launching ChromeDriver from local path: {local_driver_path}")
         driver = webdriver.Chrome(service=Service(local_driver_path), options=options)
