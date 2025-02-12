@@ -161,7 +161,7 @@ def login_to_lms(account, drivers_list):
         # service = Service(driver_path)
         # driver = webdriver.Chrome(service=service, options=options)
 
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),options=options)
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager(driver_version="120.0.6099.10900").install()),options=options)
 
         # driver = webdriver.Chrome(service=ChromiumService(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install()))
 
