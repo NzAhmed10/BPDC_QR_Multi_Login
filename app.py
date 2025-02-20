@@ -187,7 +187,7 @@ def login_to_lms(account, drivers_list):
         
         add_log(f"[{nickname}] Waiting for password input field.")
         # Change condition from clickable to visible for the password field
-        password_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='password']")))
+        password_field = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='password']")))
         driver.execute_script("arguments[0].scrollIntoView(true);", password_field)
         add_log(f"[{nickname}] Entering password for account {nickname}.")
         password_field.send_keys(password)
