@@ -143,6 +143,8 @@ def login_to_lms(account, drivers_list):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+
     # Set binary location to the Chromium browser installed via apt
     #options.binary_location = '/usr/bin/chromium-browser'
     
@@ -185,7 +187,7 @@ def login_to_lms(account, drivers_list):
         
         add_log(f"[{nickname}] Waiting for password input field.")
         # Change condition from clickable to visible for the password field
-        password_field = wait.until(EC.visibility_of_element_located((By.XPATH, "//input[@type='password']")))
+        password_field = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='password']")))
         driver.execute_script("arguments[0].scrollIntoView(true);", password_field)
         add_log(f"[{nickname}] Entering password for account {nickname}.")
         password_field.send_keys(password)
