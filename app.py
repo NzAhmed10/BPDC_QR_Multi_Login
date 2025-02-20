@@ -134,11 +134,11 @@ def login_to_lms(account, drivers_list):
     add_log(f"[{nickname}] Starting login process.")
     
     options = Options()
-    #options.add_argument("--headless")
+    options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    #options.add_argument("--window-size=1920,1080")
+    options.add_argument("--window-size=1920,1080")
     
     try:
         add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
