@@ -148,8 +148,10 @@ def login_to_lms(account, drivers_list):
     
     try:
         add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
-        service = ChromeService(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
+        #service = ChromeService(ChromeDriverManager().install())
+        # driver = webdriver.Chrome(service=service, options=options)
+        driver = webdriver.Chrome(options=options)
+
         _ = driver.title  # Basic check for driver launch
         add_log(f"[{nickname}] ChromeDriver launched successfully using auto version detection.")
     except Exception as e:
