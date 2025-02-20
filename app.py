@@ -144,12 +144,12 @@ def login_to_lms(account, drivers_list):
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
     # Set binary location to the Chromium browser installed via apt
-    options.binary_location = '/usr/bin/chromium-browser'
+    #options.binary_location = '/usr/bin/chromium-browser'
     
     try:
         add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
+        #service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(options=options)
         _ = driver.title  # Basic check for driver launch
         add_log(f"[{nickname}] ChromeDriver launched successfully using auto version detection.")
     except Exception as e:
