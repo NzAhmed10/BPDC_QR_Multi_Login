@@ -128,7 +128,7 @@ def decode_qr_code(image):
     return None
 
 # ======================================================
-# Selenium Login Function (Modified Wait for Password Field)
+# Selenium Login Function (Reordered: Gmail then LMS)
 # ======================================================
 def login_to_lms(account, drivers_list):
     nickname = account.get("nickname", "Unknown")
@@ -138,24 +138,19 @@ def login_to_lms(account, drivers_list):
     add_log(f"[{nickname}] Starting login process.")
     
     options = Options()
+    # Uncomment the line below to run headless if desired:
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
-    # options.add_argument("--no-sandbox")
-    # options.add_argument("--disable-dev-shm-usage")
-    # options.add_argument("--window-size=1920,1080")
-    # options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-blink-features=AutomationControlled")
 
-    # Set binary location to the Chromium browser installed via apt
-    #options.binary_location = '/usr/bin/chromium-browser'
-    
     try:
-        add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
-        #service = ChromeService(ChromeDriverManager().install())
-        # driver = webdriver.Chrome(service=service, options=options)
+        add_log(f"[{nickname}] Launching ChromeDriver using auto version detection.")
         driver = webdriver.Chrome(options=options)
-
         _ = driver.title  # Basic check for driver launch
-        add_log(f"[{nickname}] ChromeDriver launched successfully using auto version detection.")
+        add_log(f"[{nickname}] ChromeDriver launched successfully.")
     except Exception as e:
         st.error(f"[{nickname}] Error launching ChromeDriver: {e}")
         add_log(f"[{nickname}] Error launching ChromeDriver: {e}")
@@ -164,12 +159,33 @@ def login_to_lms(account, drivers_list):
     drivers_list.append(driver)
 
     try:
+        wait = WebDriverWait(driver, 30)
+        # Step 1: Log in to Gmail first
+        add_log(f"[{nickname}] Navigating to Gmail login page.")
+        driver.get("https://accounts.google.com/ServiceLogin?service=mail")
+        add_log(f"[{nickname}] Waiting for Gmail email input field.")
+        email_field = wait.until(EC.element_to_be_clickable((By.ID, "identifierId")))
+        add_log(f"[{nickname}] Entering Gmail email: {email}")
+        email_field.send_keys(email)
+        next_button = driver.find_element(By.ID, "identifierNext")
+        next_button.click()
+        time.sleep(3)
+        
+        add_log(f"[{nickname}] Waiting for Gmail password input field.")
+        password_field = wait.until(EC.element_to_be_clickable((By.NAME, "Passwd")))
+        add_log(f"[{nickname}] Entering Gmail password.")
+        password_field.send_keys(password)
+        password_next = driver.find_element(By.ID, "passwordNext")
+        password_next.click()
+        time.sleep(5)
+        add_log(f"[{nickname}] Gmail login successful.")
+
+        # Step 2: Navigate to LMS page and click Google login button
         add_log(f"[{nickname}] Navigating to LMS URL.")
         driver.get("https://lms.bits-pilani.ac.in/")
-        # Increase timeout to 30 seconds to account for slower transitions
         wait = WebDriverWait(driver, 30)
         
-        add_log(f"[{nickname}] Waiting for Google login button.")
+        add_log(f"[{nickname}] Waiting for Google login button on LMS page.")
         google_login_button = wait.until(
             EC.element_to_be_clickable((By.XPATH, "//*[@id='region-main']/div[1]/div[1]/div[1]/div[1]/div[3]/a[1]"))
         )
@@ -177,30 +193,28 @@ def login_to_lms(account, drivers_list):
         driver.execute_script("arguments[0].click();", google_login_button)
         time.sleep(2)
         
-        add_log(f"[{nickname}] Waiting for email input field.")
-        email_field = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='email']")))
-        driver.execute_script("arguments[0].scrollIntoView(true);", email_field)
-        add_log(f"[{nickname}] Entering email: {email}")
-        email_field.send_keys(email)
-        email_field.send_keys(Keys.RETURN)
-        time.sleep(3)
-        
-        add_log(f"[{nickname}] Waiting for password input field.")
-        # Change condition from clickable to visible for the password field
-        password_field = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@type='password']")))
-        driver.execute_script("arguments[0].scrollIntoView(true);", password_field)
-        add_log(f"[{nickname}] Entering password for account {nickname}.")
-        password_field.send_keys(password)
-        password_field.send_keys(Keys.RETURN)
+        # Since the Gmail session is active, LMS should now log in automatically.
+        st.write(f"✅ {nickname} logged in successfully via Gmail!")
+        add_log(f"[{nickname}] Login successful on LMS.")
         time.sleep(5)
-        
-        st.write(f"✅ {nickname} logged in successfully!")
-        add_log(f"[{nickname}] Login successful.")
     except Exception as e:
         tb = traceback.format_exc()
-        error_message = f"[{nickname}] Error during login after driver launch: {e}\nTraceback:\n{tb}"
+        error_message = f"[{nickname}] Error during login process: {e}\nTraceback:\n{tb}"
         st.error(error_message)
         add_log(error_message)
+        try:
+            screenshot_file = f"{nickname}_error.png"
+            driver.save_screenshot(screenshot_file)
+            st.info(f"Screenshot saved: {screenshot_file}")
+        except Exception as ss_e:
+            st.error(f"Error capturing screenshot: {ss_e}")
+        try:
+            page_source_file = f"{nickname}_error.html"
+            with open(page_source_file, "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            st.info(f"Page source saved: {page_source_file}")
+        except Exception as ps_e:
+            st.error(f"Error saving page source: {ps_e}")
         if driver:
             driver.quit()
             drivers_list.remove(driver)
