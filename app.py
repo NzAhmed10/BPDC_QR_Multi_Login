@@ -23,6 +23,10 @@ import subprocess  # Import subprocess
 # MUST be the very first Streamlit command!
 st.set_page_config(page_title="BITS LMS Multi-Account Login & QR Redirect", layout="wide")
 
+# NOTE: Ensure you have an apt.txt file with:
+# chromium-browser
+# chromium-chromedriver
+
 # Import the cookie manager from streamlit-cookies-manager
 from streamlit_cookies_manager import EncryptedCookieManager
 
@@ -139,10 +143,13 @@ def login_to_lms(account, drivers_list):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
+    # Set binary location to the Chromium browser installed via apt
+    options.binary_location = '/usr/bin/chromium-browser'
     
     try:
         add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
-        driver = webdriver.Chrome(options=options)
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
         _ = driver.title  # Basic check for driver launch
         add_log(f"[{nickname}] ChromeDriver launched successfully using auto version detection.")
     except Exception as e:
