@@ -14,7 +14,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
@@ -148,7 +148,7 @@ def login_to_lms(account, drivers_list):
     
     try:
         add_log(f"[{nickname}] Launching ChromeDriver using ChromeDriverManager.")
-        service = ChromeDriverManager().install()
+        service = ChromeService(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
         _ = driver.title  # Basic check for driver launch
         add_log(f"[{nickname}] ChromeDriver launched successfully using auto version detection.")
